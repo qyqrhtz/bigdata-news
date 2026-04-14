@@ -58,4 +58,10 @@ public interface NewsService {
      * 对应前端 DataScreen.vue 的初始化请求
      */
     Map<String, Object> getGlobalDashboardStats();
+    /**
+     * 对接 Python Flask 实现的语义搜索 (RAG)
+     * @param query 用户输入的关键词
+     * @param topK 返回匹配度最高的条数
+     */
+    List<Map<String, Object>> semanticSearch(String query, int topK);
 }

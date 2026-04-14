@@ -31,3 +31,18 @@ build/
 
 ### VS Code ###
 .vscode/
+# 模型
+all-MiniLM-L6-v2/
+
+# 向量索引
+*.faiss
+*.pkl
+
+# 数据
+data/
+
+# Python缓存
+__pycache__/
+
+# 日志
+*.log
