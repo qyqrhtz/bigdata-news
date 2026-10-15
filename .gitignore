@@ -40,9 +40,18 @@ all-MiniLM-L6-v2/
 
 # 数据
 data/
+rag-data/
+mysql/data/
+teacher-submit-*/
+teacher-submit*.zip
+submit/
 
 # Python缓存
 __pycache__/
+.venv/
+.env
+news-frontend/node_modules/
+news-frontend/dist/
 
 # 日志
 *.log

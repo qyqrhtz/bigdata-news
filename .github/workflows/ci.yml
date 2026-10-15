@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  verify:
+    name: Verify backend, frontend, Python and Compose
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: news-frontend/package-lock.json
+
+      - name: Backend clean test
+        run: ./mvnw clean test
+
+      - name: Python syntax check
+        run: |
+          python3 -m py_compile \
+            main.py \
+            news_to_parquet.py \
+            news_analysis.py \
+            test.py \
+            rag-service/app.py \
+            rag-service/wsgi.py
+
+      - name: Docker Compose config
+        run: docker compose config --quiet
+
+      - name: Docker Compose config with RAG profile
+        run: docker compose --profile rag config --quiet
+
+      - name: Install frontend dependencies
+        working-directory: news-frontend
+        run: npm ci
+
+      - name: Frontend build
+        working-directory: news-frontend
+        run: npm run build

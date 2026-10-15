@@ -1,13 +1,20 @@
 package com.example.bigdata_news.serviceimpl;
 
+import com.example.bigdata_news.dto.RagSearchResult;
 import com.example.bigdata_news.entity.News;
 import com.example.bigdata_news.repository.NewsRepository;
 import com.example.bigdata_news.service.NewsService;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.web.util.UriComponentsBuilder;
 import org.springframework.web.client.RestTemplate;
 
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -22,17 +29,38 @@ public class NewsServiceImpl implements NewsService {
     private final NewsRepository newsRepository;
     private final RestTemplate restTemplate;
 
+    @Value("${rag.service-url:http://127.0.0.1:5000}")
+    private String ragServiceUrl;
+
     public NewsServiceImpl(NewsRepository newsRepository, RestTemplate restTemplate) {
         this.newsRepository = newsRepository;
         this.restTemplate = restTemplate;
     }
 
     @Override
-    public List<Map<String, Object>> semanticSearch(String query, int topK) {
-        String url = "http://127.0.0.1:5000/rag?query=" + query + "&top_k=" + topK;
+    public List<RagSearchResult> semanticSearch(String query, int topK) {
+        if (query == null || query.isBlank()) {
+            return List.of();
+        }
+
+        int normalizedTopK = Math.max(1, Math.min(topK, 20));
+        URI uri = UriComponentsBuilder.fromUriString(ragServiceUrl)
+                .path("/rag")
+                .queryParam("query", query.trim())
+                .queryParam("top_k", normalizedTopK)
+                .build()
+                .encode()
+                .toUri();
+
         try {
-            // 注意：这里返回 List.class 是可以的，但建议在 Python 端统一 JSON 格式
-            return restTemplate.getForObject(url, List.class);
+            ResponseEntity<List<RagSearchResult>> response = restTemplate.exchange(
+                    uri,
+                    HttpMethod.GET,
+                    null,
+                    new ParameterizedTypeReference<>() {
+                    }
+            );
+            return response.getBody() == null ? List.of() : response.getBody();
         } catch (Exception e) {
             log.error("调用 Python RAG 服务连接失败: {}", e.getMessage());
             return new ArrayList<>();

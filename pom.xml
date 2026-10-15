@@ -11,14 +11,16 @@
 	<groupId>com.example</groupId>
 	<artifactId>bigdata-news</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
-	<name>bigdata-news</name>
-	<description>Demo project for Spring Boot</description>
-	<url/>
+	<name>Bigdata News Analytics Platform</name>
+	<description>Spring Boot backend for a Spark/Hadoop news analytics and FAISS RAG retrieval platform.</description>
+	<url>https://example.com/bigdata-news</url>
 	<licenses>
 		<license/>
 	</licenses>
 	<developers>
-		<developer/>
+		<developer>
+			<name>Bigdata News Team</name>
+		</developer>
 	</developers>
 	<scm>
 		<connection/>
@@ -28,6 +30,7 @@
 	</scm>
 	<properties>
 		<java.version>17</java.version>
+		<springdoc.version>2.8.13</springdoc.version>
 	</properties>
 	<dependencies>
 		<dependency>
@@ -41,6 +44,11 @@
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-web</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springdoc</groupId>
+			<artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+			<version>${springdoc.version}</version>
 		</dependency>
 
 		<!-- Topic modeling (LDA) -->
@@ -64,6 +72,11 @@
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>com.h2database</groupId>
+			<artifactId>h2</artifactId>
 			<scope>test</scope>
 		</dependency>
 		<dependency>

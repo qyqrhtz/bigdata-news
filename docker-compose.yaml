@@ -1,0 +1,89 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: mysql8
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-123456}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-mydb}
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    volumes:
+      - ./mysql/data:/var/lib/mysql
+      - ./mysql/init:/docker-entrypoint-initdb.d:ro
+
+  mongo:
+    image: mongo:6.0
+    container_name: mongo6
+    ports:
+      - "${MONGO_PORT:-27017}:27017"
+
+  redis:
+    image: redis:7.0
+    container_name: redis7
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+
+  namenode:
+    image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
+    container_name: namenode
+    environment:
+      - CLUSTER_NAME=${HADOOP_CLUSTER_NAME:-news-cluster}
+      - CORE_CONF_fs_defaultFS=hdfs://namenode:8020
+    ports:
+      - "${HDFS_WEB_PORT:-19870}:9870"
+      - "${HDFS_RPC_PORT:-8020}:8020"
+    volumes:
+      - namenode_data:/hadoop/dfs/name
+
+  datanode:
+    image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
+    container_name: datanode
+    environment:
+      - SERVICE_PRECONDITION=namenode:9870
+      - CORE_CONF_fs_defaultFS=hdfs://namenode:8020
+    volumes:
+      - datanode_data:/hadoop/dfs/data
+    depends_on:
+      - namenode
+
+  spark-master:
+    image: apache/spark:3.5.3
+    container_name: spark-master
+    command: bash -c "/opt/spark/sbin/start-master.sh && tail -f /opt/spark/logs/*"
+    ports:
+      - "${SPARK_MASTER_WEB_PORT:-8080}:8080"
+      - "${SPARK_MASTER_PORT:-7077}:7077"
+    depends_on:
+      - namenode
+
+  spark-worker:
+    image: apache/spark:3.5.3
+    container_name: spark-worker
+    command: bash -c "/opt/spark/sbin/start-slave.sh spark://spark-master:7077 && tail -f /opt/spark/logs/*"
+    depends_on:
+      - spark-master
+
+  rag-service:
+    build:
+      context: ./rag-service
+    image: bigdata-news-rag:latest
+    container_name: rag-service
+    profiles:
+      - rag
+    environment:
+      RAG_MODEL_PATH: ${RAG_CONTAINER_MODEL_PATH:-/models/all-MiniLM-L6-v2}
+      RAG_DB_URL: ${RAG_CONTAINER_DB_URL:-mysql+pymysql://root:123456@mysql8/mydb}
+      RAG_INDEX_FILE: ${RAG_CONTAINER_INDEX_FILE:-/data/news_index.faiss}
+      RAG_DATA_FILE: ${RAG_CONTAINER_DATA_FILE:-/data/news_data.pkl}
+      RAG_BATCH_SIZE: ${RAG_BATCH_SIZE:-32}
+    ports:
+      - "${RAG_PORT:-5000}:5000"
+    volumes:
+      - ${RAG_MODEL_DIR:-./all-MiniLM-L6-v2}:${RAG_CONTAINER_MODEL_PATH:-/models/all-MiniLM-L6-v2}:ro
+      - ${RAG_DATA_DIR:-./rag-data}:/data
+    depends_on:
+      - mysql
+
+volumes:
+  namenode_data:
+  datanode_data:

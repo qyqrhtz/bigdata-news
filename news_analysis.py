@@ -1,76 +1,77 @@
 # -*- coding: utf-8 -*-
+import argparse
+import os
+
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, to_date, explode, split
-from pyspark.sql.types import StructType, StructField, StringType, DateType, IntegerType
+from pyspark.sql.functions import col, to_date, explode, split, lit
+from pyspark.sql.types import StructType, StructField, StringType
 
-# ========================
-# 1️⃣ 创建 SparkSession
-# ========================
-spark = (
-    SparkSession.builder
-    .appName("News Analysis")
-    .config("spark.sql.shuffle.partitions", "4")
-    .config("spark.jars", "/opt/spark/jars/mysql-connector-java-8.0.29.jar")  # 加入 JDBC 驱动路径
-    .getOrCreate()
-)
 
-# ========================
-# 2️⃣ 定义 schema 和读取 HDFS clean 数据
-# ========================
-# 定义数据的 schema
-schema = StructType([
-    StructField("source", StringType(), True),
-    StructField("date", StringType(), True),
-    StructField("category", StringType(), True),
-    StructField("title", StringType(), True)
-])
+def parse_args():
+    parser = argparse.ArgumentParser(description="Run Spark statistics over processed news data and write results to MySQL.")
+    parser.add_argument("--input-path", default=os.getenv("NEWS_ANALYSIS_INPUT", "hdfs://namenode:8020/news/processed"))
+    parser.add_argument("--input-format", default=os.getenv("NEWS_ANALYSIS_FORMAT", "parquet"), choices=["parquet", "json"])
+    parser.add_argument("--mysql-url", default=os.getenv("SPARK_MYSQL_URL", "jdbc:mysql://mysql8:3306/mydb?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true"))
+    parser.add_argument("--mysql-user", default=os.getenv("SPARK_MYSQL_USER", "root"))
+    parser.add_argument("--mysql-password", default=os.getenv("SPARK_MYSQL_PASSWORD", "123456"))
+    parser.add_argument("--mysql-driver", default=os.getenv("SPARK_MYSQL_DRIVER", "com.mysql.cj.jdbc.Driver"))
+    parser.add_argument("--jdbc-jar", default=os.getenv("SPARK_MYSQL_JAR", "/opt/spark/jars/mysql-connector-java-8.0.29.jar"))
+    parser.add_argument("--shuffle-partitions", default=os.getenv("SPARK_SHUFFLE_PARTITIONS", "4"))
+    parser.add_argument("--write-mode", default=os.getenv("SPARK_WRITE_MODE", "overwrite"))
+    return parser.parse_args()
 
-# 读取 HDFS clean 数据，使用 schema
-df_clean = spark.read.schema(schema).json("hdfs://namenode:8020/news/processed")
 
-# 查看数据的 schema 和前几行数据
-df_clean.printSchema()
-df_clean.show(5, truncate=False)
+def main():
+    args = parse_args()
 
-# ========================
-# 3️⃣ 数据分析
-# ========================
+    spark_builder = (
+        SparkSession.builder
+        .appName("News Analysis")
+        .config("spark.sql.shuffle.partitions", args.shuffle_partitions)
+    )
+    if args.jdbc_jar:
+        spark_builder = spark_builder.config("spark.jars", args.jdbc_jar)
 
-# 3.1 新闻来源统计
-source_stats = df_clean.groupBy("source").count()
-source_stats.show(20)
+    spark = spark_builder.getOrCreate()
 
-# 3.2 每日新闻数量
-df_clean = df_clean.withColumn("date_only", to_date(col("date")))
-date_stats = df_clean.groupBy("date_only").count()
-date_stats.show(20)
+    schema = StructType([
+        StructField("source", StringType(), True),
+        StructField("date", StringType(), True),
+        StructField("category", StringType(), True),
+        StructField("title", StringType(), True)
+    ])
 
-# 3.3 新闻分类统计
-category_stats = df_clean.groupBy("category").count()
-category_stats.show(20)
+    if args.input_format == "json":
+        df_clean = spark.read.schema(schema).json(args.input_path)
+    else:
+        df_clean = spark.read.parquet(args.input_path)
 
-# 3.4 标题关键词统计
-words = df_clean.select(explode(split(col("title"), " ")).alias("word"))
-word_count = words.groupBy("word").count().orderBy(col("count").desc())
-word_count.show(20)
+    if "source" not in df_clean.columns:
+        df_clean = df_clean.withColumn("source", lit("unknown"))
+    df_clean.printSchema()
+    df_clean.show(5, truncate=False)
 
-# ========================
-# 4️⃣ 写入 MySQL
-# ========================
-mysql_url = "jdbc:mysql://mysql:3306/news?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true"
-mysql_props = {
-    "user": "root",
-    "password": "123456",  # 修改为你自己的密码
-    "driver": "com.mysql.cj.jdbc.Driver"
-}
+    source_stats = df_clean.groupBy("source").count()
+    df_clean = df_clean.withColumn("date_only", to_date(col("date")))
+    date_stats = df_clean.groupBy("date_only").count()
+    category_stats = df_clean.groupBy("category").count()
+    words = df_clean.select(explode(split(col("title"), " ")).alias("word"))
+    word_count = words.groupBy("word").count().orderBy(col("count").desc())
 
-source_stats.write.mode("overwrite").jdbc(mysql_url, "source_stats", properties=mysql_props)
-date_stats.write.mode("overwrite").jdbc(mysql_url, "date_stats", properties=mysql_props)
-category_stats.write.mode("overwrite").jdbc(mysql_url, "category_stats", properties=mysql_props)
-word_count.write.mode("overwrite").jdbc(mysql_url, "word_count", properties=mysql_props)
+    mysql_props = {
+        "user": args.mysql_user,
+        "password": args.mysql_password,
+        "driver": args.mysql_driver
+    }
 
-# ========================
-# 5️⃣ 完成
-# ========================
-print("✅ 新闻分析完成，结果已写入 MySQL")
-spark.stop()
+    source_stats.write.mode(args.write_mode).jdbc(args.mysql_url, "source_stats", properties=mysql_props)
+    date_stats.write.mode(args.write_mode).jdbc(args.mysql_url, "date_stats", properties=mysql_props)
+    category_stats.write.mode(args.write_mode).jdbc(args.mysql_url, "category_stats", properties=mysql_props)
+    word_count.write.mode(args.write_mode).jdbc(args.mysql_url, "word_count", properties=mysql_props)
+
+    print("News analysis completed and results were written to MySQL.")
+    spark.stop()
+
+
+if __name__ == "__main__":
+    main()

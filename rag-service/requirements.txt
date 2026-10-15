@@ -1,0 +1,7 @@
+flask>=3.0.0
+faiss-cpu>=1.8.0
+pandas>=2.2.0
+pymysql>=1.1.0
+sqlalchemy>=2.0.0
+sentence-transformers>=3.0.0
+torch>=2.2.0

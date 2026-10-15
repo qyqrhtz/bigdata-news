@@ -1,5 +1,6 @@
 package com.example.bigdata_news.service;
 
+import com.example.bigdata_news.dto.RagSearchResult;
 import com.example.bigdata_news.entity.News;
 import org.springframework.data.domain.Page;
 
@@ -63,5 +64,5 @@ public interface NewsService {
      * @param query 用户输入的关键词
      * @param topK 返回匹配度最高的条数
      */
-    List<Map<String, Object>> semanticSearch(String query, int topK);
+    List<RagSearchResult> semanticSearch(String query, int topK);
 }

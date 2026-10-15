@@ -32,6 +32,10 @@ public class CozeService {
 
     @SuppressWarnings("unchecked")
     public String callCoze(String question, String context) {
+        if (token == null || token.isBlank() || workflowId == null || workflowId.isBlank()) {
+            log.warn("Coze token or workflow id is not configured; skip remote workflow call");
+            return "Coze 服务未配置，请设置 COZE_TOKEN 和 COZE_WORKFLOW_ID 后重试。";
+        }
 
         // 1. 构造 Prompt（RAG 核心）
         String prompt = String.format("""

@@ -1,29 +1,32 @@
+import argparse
 import requests
 import json
 import os
 from datetime import datetime
 
-# ==========================
-# 1️⃣ 在这里填写你的 APPKEY
-# ==========================
-APPKEY = "b29df05926434ac8096ec7777c6190ce"
 
-# 新闻类型：
-# top(头条) / guonei(国内) / guoji(国际) / keji(科技) / caijing(财经)
-NEWS_TYPE = "guonei"
+def parse_args():
+    parser = argparse.ArgumentParser(description="Fetch news data from Juhe Toutiao API.")
+    parser.add_argument("--appkey", default=os.getenv("JUHE_APPKEY", ""), help="Juhe API key. Can also use JUHE_APPKEY.")
+    parser.add_argument(
+        "--news-type",
+        default=os.getenv("NEWS_TYPE", "guonei"),
+        choices=["top", "guonei", "guoji", "keji", "caijing"],
+        help="News category to fetch.",
+    )
+    parser.add_argument("--output-dir", default=os.getenv("NEWS_OUTPUT_DIR", "news_data"), help="Output directory.")
+    return parser.parse_args()
 
-# 保存目录
-OUTPUT_DIR = "news_data"
 
-# ==========================
+def fetch_news(appkey, news_type, output_dir):
+    if not appkey:
+        raise ValueError("Juhe APPKEY is required. Set JUHE_APPKEY or pass --appkey.")
 
-
-def fetch_news():
     url = "http://v.juhe.cn/toutiao/index"
 
     params = {
-        "key": APPKEY,
-        "type": NEWS_TYPE
+        "key": appkey,
+        "type": news_type
     }
 
     try:
@@ -38,12 +41,12 @@ def fetch_news():
             return
 
         # 创建目录
-        if not os.path.exists(OUTPUT_DIR):
-            os.makedirs(OUTPUT_DIR)
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
 
         # 生成带时间戳文件名
-        filename = f"{NEWS_TYPE}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-        filepath = os.path.join(OUTPUT_DIR, filename)
+        filename = f"{news_type}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        filepath = os.path.join(output_dir, filename)
 
         # 添加抓取时间
         data["_fetched_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -60,4 +63,5 @@ def fetch_news():
 
 
 if __name__ == "__main__":
-    fetch_news()
+    args = parse_args()
+    fetch_news(args.appkey, args.news_type, args.output_dir)

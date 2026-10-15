@@ -1,0 +1,10 @@
+__pycache__/
+.venv/
+*.pyc
+*.pyo
+*.pyd
+*.faiss
+*.pkl
+data/
+models/
+*.log
